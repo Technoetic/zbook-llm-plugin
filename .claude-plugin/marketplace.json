@@ -1,0 +1,12 @@
+{
+  "name": "zbook-tools",
+  "description": "ZBook 로컬 AI 스택(<드라이브>:\\LLM · llama-server)을 Claude Code에서 다루는 플러그인 모음",
+  "owner": { "name": "technoetic" },
+  "plugins": [
+    {
+      "name": "zbook-llm",
+      "source": "./plugins/zbook-llm",
+      "description": "ZBook 로컬 AI(llama-server) 연동 검증·기동 커맨드 — /llm-check, /llm-up"
+    }
+  ]
+}
