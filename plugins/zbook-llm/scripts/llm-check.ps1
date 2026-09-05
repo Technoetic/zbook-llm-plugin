@@ -1,69 +1,80 @@
 ﻿<#
-  llm-check.ps1 — 로컬 LLM 연동 3단계 검증 (읽기 전용 — 서버를 띄우지 않는다)
-
-  설계 계약:
-    · 검증만 한다. 기동은 /llm-up(llm-up.ps1) 소관 — 실패 시 안내만 남긴다.
-    · 포트 생존(1)과 신원(2)을 분리한다 — 8080 점유자가 llama-server라는 보장이 없다.
-    · 실추론 왕복(3)까지 가야 PASS다 — health ok 여도 thinking 미해제면 content가 빈 채 온다(2026-09-02 실측).
-    · 추론 프롬프트는 ASCII만 쓴다 — 요청 본문 인코딩 변수를 검증 경로에서 제거.
-
-  종료코드: 0=PASS / 1=서버 미가동 / 2=신원 불일치 / 3=추론 실패
+  llm-check.ps1 — 로컬 LLM 연동 검증. 서버·BIOS 설정을 변경하지 않는다.
+  종료코드: 0=PASS / 1=서버 준비 안 됨 / 2=API·인증 불일치 / 3=추론 실패
+  공개된 로컬 키의 적용 여부를 검사하며 프로세스 신원을 보증하지 않는다.
 #>
-$Port = 8080
-$Key  = 'ns-local'
-$Base = "http://127.0.0.1:$Port"
+[CmdletBinding()]
+param([ValidateRange(1, 65535)][int]$Port = 8080)
 
+$Key = 'ns-local'
+$Base = "http://127.0.0.1:$Port"
 function Out-Line([string]$s) { Write-Output "[llm-check] $s" }
 
-# 1) 생존 — /health 는 인증 불요
+function Assert-AuthRejected([hashtable]$Headers, [string]$Label) {
+    $status = $null
+    try {
+        $null = Invoke-RestMethod "$Base/v1/models" -Headers $Headers -TimeoutSec 3 -ErrorAction Stop
+    } catch {
+        if ($null -ne $_.Exception.Response) {
+            $status = [int]$_.Exception.Response.StatusCode
+        }
+        if ($status -notin @(401, 403)) {
+            throw "$Label 거부 여부를 확인할 수 없음: $($_.Exception.Message)"
+        }
+    }
+    if ($status -notin @(401, 403)) { throw "$Label 요청이 허용됨: API 키 설정 확인 필요" }
+}
+
+# 1) 준비 상태. /health는 인증 없이 조회한다.
 try {
     $h = Invoke-RestMethod "$Base/health" -TimeoutSec 3 -ErrorAction Stop
     if ($h.status -ne 'ok') { throw "status=$($h.status)" }
-    Out-Line "1/3 health: ok"
+    Out-Line '1/3 health: ok'
 } catch {
-    Out-Line "1/3 health: 실패 — $($_.Exception.Message)"
-    Out-Line "FAIL(1) 서버 미가동 — 기동: /llm-up 실행 (설치 폴더가 없으면 「로컬AI-설치.zip」의 「2. 설치.bat」 선행)"
+    Out-Line "FAIL(1) 서버 준비 안 됨 — $($_.Exception.Message)"
+    Out-Line '기동이 필요하면 /llm-up 실행. 로딩 중이면 기다린 뒤 재검증.'
     exit 1
 }
 
-# 2) 신원 — 포트 점유자가 인증 키를 아는 llama-server 인지
-$model = $null
+# 2) 올바른 키 허용 + 무인증·틀린 키 거부를 모두 확인한다.
 try {
-    $id = (Invoke-RestMethod "$Base/v1/models" -Headers @{Authorization = "Bearer $Key"} -TimeoutSec 3 -ErrorAction Stop).data[0].id
-    if (-not $id) { throw "모델 목록이 비어 있음" }
+    $models = Invoke-RestMethod "$Base/v1/models" -Headers @{Authorization = "Bearer $Key"} -TimeoutSec 3 -ErrorAction Stop
+    $id = $models.data[0].id
+    if ($id -isnot [string] -or [string]::IsNullOrWhiteSpace($id)) { throw '유효한 모델 ID가 없음' }
+    Assert-AuthRejected @{} '무인증'
+    Assert-AuthRejected @{Authorization = 'Bearer zbook-check-invalid-key'} '틀린 키'
     $model = Split-Path $id -Leaf
-    Out-Line "2/3 신원: $model"
+    Out-Line "2/3 API·인증: $model (무인증·틀린 키 거부 확인)"
 } catch {
-    Out-Line "2/3 신원: 실패 — 포트 $Port 점유자가 llama-server 가 아니거나 키 불일치. $($_.Exception.Message)"
+    Out-Line "FAIL(2) API·인증 불일치 — $($_.Exception.Message)"
     exit 2
 }
 
-# 3) 실추론 왕복 — enable_thinking=false 직답이 실제로 오는지
+# 3) 발견한 모델에 실추론을 요청한다. 정답과 정상 종료가 모두 필요하다.
 $body = @{
-    model    = 'default'
-    messages = @(@{ role = 'user'; content = 'Reply with only the single digit answer: 1+1=?' })
-    max_tokens  = 20
+    model = $id
+    messages = @(@{role = 'user'; content = 'Reply with only the single digit answer: 1+1=?'})
+    max_tokens = 20
     temperature = 0
-    chat_template_kwargs = @{ enable_thinking = $false }
+    chat_template_kwargs = @{enable_thinking = $false}
 } | ConvertTo-Json -Depth 5
-
 $sw = [Diagnostics.Stopwatch]::StartNew()
 try {
     $r = Invoke-RestMethod "$Base/v1/chat/completions" -Method Post `
-         -Headers @{Authorization = "Bearer $Key"} -ContentType 'application/json' `
-         -Body $body -TimeoutSec 30 -ErrorAction Stop
+        -Headers @{Authorization = "Bearer $Key"} -ContentType 'application/json; charset=utf-8' `
+        -Body ([Text.Encoding]::UTF8.GetBytes($body)) -TimeoutSec 30 -ErrorAction Stop
     $sw.Stop()
-    $content = $r.choices[0].message.content
-    if ([string]::IsNullOrWhiteSpace($content)) {
-        Out-Line "3/3 추론: 빈 응답 — thinking 미해제 의심 (finish=$($r.choices[0].finish_reason), $($r.usage.total_tokens)토큰 소모)"
-        exit 3
+    $choice = $r.choices[0]
+    $content = $choice.message.content
+    if ($content -isnot [string] -or $content.Trim() -cne '2' -or $choice.finish_reason -ne 'stop') {
+        throw "정답 '2'와 finish_reason=stop 필요 (finish=$($choice.finish_reason))"
     }
     $sec = [math]::Round($sw.Elapsed.TotalSeconds, 1)
-    Out-Line "3/3 추론: '$($content.Trim())' (${sec}초, $($r.usage.total_tokens)토큰)"
+    Out-Line "3/3 추론: '2' (${sec}초, $($r.usage.total_tokens)토큰)"
 } catch {
-    Out-Line "3/3 추론: 실패 — $($_.Exception.Message)"
+    Out-Line "FAIL(3) 추론 실패 — $($_.Exception.Message)"
     exit 3
 }
 
-Out-Line "PASS — 연동 정상 · $Base · $model · enable_thinking=false 직답 확인"
+Out-Line "PASS — 연동 정상 · $Base · $model · enable_thinking=false 정답 확인"
 exit 0

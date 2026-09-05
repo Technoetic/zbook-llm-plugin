@@ -6,7 +6,7 @@
     {
       "name": "zbook-llm",
       "source": "./plugins/zbook-llm",
-      "description": "ZBook 로컬 AI(llama-server) 연동 검증·기동 커맨드 — /llm-check, /llm-up"
+      "description": "ZBook 로컬 AI 검증·기동 및 GPU 16GB 조회 — /llm-check, /llm-up, /vgm-check"
     }
   ]
 }
