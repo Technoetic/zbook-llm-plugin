@@ -108,7 +108,7 @@ class AppServer:
 
 @unittest.skipUnless(os.name == "nt", "requires Windows and Codex CLI")
 class NativeCodexPluginTests(unittest.TestCase):
-    def test_relocated_plugin_installs_and_discovers_four_native_skills(self):
+    def test_relocated_plugin_installs_and_discovers_native_skills(self):
         executable = find_codex_executable()
         if executable is None:
             self.skipTest("native Codex executable not installed (codex.exe or npm codex.cmd)")
@@ -162,7 +162,7 @@ class NativeCodexPluginTests(unittest.TestCase):
             skills = [skill for skill in entry["skills"] if skill.get("pluginId") == PLUGIN_ID]
             self.assertEqual({skill["name"] for skill in skills},
                              {f"zbook-llm:{name}" for name in EXPECTED})
-            self.assertEqual(len(skills), 4)
+            self.assertEqual(len(skills), len(EXPECTED))
             self.assertEqual(list(cache_root.rglob("migrated-command-skills")), [])
 
             for skill in skills:

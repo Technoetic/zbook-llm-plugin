@@ -1,6 +1,6 @@
 # ZBook Ultra G1a — GPU 메모리 16GB 유지 확인
 
-운영 정책은 **GPU 메모리 16GB 유지**다. `vgm-check` 스킬은 HP BIOS 설정과 RAM 수치를 읽기 전용으로 확인한다. BIOS 변경이나 재부팅은 수행하지 않는다. `vgm-32gb`는 기존 호출을 위한 호환 별칭으로 같은 검사만 실행한다.
+운영 정책은 **GPU 메모리 16GB 유지**다. `vgm-check` 스킬은 HP BIOS 설정과 RAM 수치를 읽기 전용으로 확인한다. BIOS 변경이나 재부팅은 수행하지 않는다. `vgm-32gb` 호환 별칭은 0.5.0에서 제거됐다.
 
 2026-09-05 확인된 기계는 `HP ZBook Ultra G1a 14 inch Mobile Workstation PC`이며, BIOS `Dedicated Graphics Memory` 값은 `16 GB`, 설치 RAM은 `64.00 GiB`, Windows 인식 총 RAM은 약 `47.78 GiB`다. 다른 기계에서는 실제 조회 결과를 보고하며 이 RAM 수치를 강제하지 않는다.
 
