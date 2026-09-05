@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import time
 import unittest
 
 
@@ -18,14 +19,18 @@ POWERSHELL = shutil.which("powershell.exe")
 
 @unittest.skipUnless(os.name == "nt" and POWERSHELL, "Windows PowerShell 5.1 required")
 class LlmUpTests(unittest.TestCase):
-    def run_up(self, *, default="small model.gguf", installed=True, **overrides):
+    def run_up(self, *, default="small model.gguf", installed=True, extra_models=None,
+               generic_models=True, **overrides):
         with tempfile.TemporaryDirectory(prefix="llm up regression ") as name:
             root = Path(name)
             models = root / "LLM" / "models"
             if installed:
                 models.mkdir(parents=True)
-                (models / "small model.gguf").write_bytes(b"GGUF")
-                (models / "large model.gguf").write_bytes(b"GGUF" * 8)
+                if generic_models:
+                    (models / "small model.gguf").write_bytes(b"GGUF")
+                    (models / "large model.gguf").write_bytes(b"GGUF" * 8)
+                for filename, size in (extra_models or {}).items():
+                    (models / filename).write_bytes(b"G" * size)
                 (models / "pretend.gguf").mkdir()
                 (models / "not-a-model.txt").write_text("ignore", encoding="utf-8")
                 if default is not None:
@@ -46,12 +51,31 @@ class LlmUpTests(unittest.TestCase):
             scenario.update(overrides)
             config = root / "scenario.json"
             config.write_text(json.dumps(scenario), encoding="utf-8")
-            result = subprocess.run(
-                [POWERSHELL, "-NoLogo", "-NoProfile", "-NonInteractive",
-                 "-ExecutionPolicy", "Bypass", "-File", str(HARNESS),
-                 "-TargetScript", str(SCRIPT), "-ScenarioFile", str(config)],
-                cwd=root, capture_output=True, encoding="utf-8", errors="replace", timeout=30,
-            )
+            command = [POWERSHELL, "-NoLogo", "-NoProfile", "-NonInteractive",
+                       "-ExecutionPolicy", "Bypass", "-File", str(HARNESS),
+                       "-TargetScript", str(SCRIPT), "-ScenarioFile", str(config)]
+            with subprocess.Popen(command, cwd=root, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  encoding="utf-8", errors="replace") as process:
+                captured_before_release = False
+                try:
+                    stdout, stderr = process.communicate(timeout=8 if scenario.get("captureChild") else 30)
+                    captured_before_release = ((root / "child-started").exists()
+                                               and not (root / "child-exited").exists())
+                except subprocess.TimeoutExpired:
+                    if not scenario.get("captureChild"):
+                        process.kill()
+                        process.communicate()
+                        raise
+                    (root / "release-child").touch()
+                    stdout, stderr = process.communicate(timeout=10)
+                finally:
+                    (root / "release-child").touch()
+                    if (root / "child-started").exists():
+                        deadline = time.monotonic() + 5
+                        while not (root / "child-exited").exists() and time.monotonic() < deadline:
+                            time.sleep(0.05)
+                result = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+                result.captured_before_release = captured_before_release
             event_file = root / "events.jsonl"
             events = ([json.loads(line) for line in event_file.read_text(encoding="utf-8-sig").splitlines()]
                       if event_file.exists() else [])
@@ -123,6 +147,46 @@ class LlmUpTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(argv[argv.index("-m") + 1], str(models / "large model.gguf"))
 
+    def test_unpinned_model_prefers_installed_9b_even_when_smaller_models_exist(self):
+        for default in (None, "missing.gguf"):
+            with self.subTest(default=default):
+                result, _, argv, models = self.run_up(
+                    default=default, nativeArguments=True, extra_models={
+                        "Qwen3.5-9B-Q8_0.gguf": 90, "Qwen3.5-4B-Q8_0.gguf": 40})
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(argv[argv.index("-m") + 1], str(models / "Qwen3.5-9B-Q8_0.gguf"))
+
+    def test_unpinned_model_prefers_installed_4b_when_9b_is_absent(self):
+        result, _, argv, models = self.run_up(
+            default=None, nativeArguments=True, extra_models={"Qwen3.5-4B-Q8_0.gguf": 40})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(argv[argv.index("-m") + 1], str(models / "Qwen3.5-4B-Q8_0.gguf"))
+
+    def test_explicit_4b_selection_is_preserved_when_9b_is_installed(self):
+        result, _, argv, models = self.run_up(
+            default="Qwen3.5-4B-Q8_0.gguf", nativeArguments=True, extra_models={
+                "Qwen3.5-9B-Q8_0.gguf": 90, "Qwen3.5-4B-Q8_0.gguf": 40})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(argv[argv.index("-m") + 1], str(models / "Qwen3.5-4B-Q8_0.gguf"))
+
+    def test_automatic_fallback_does_not_launch_a_projection_file(self):
+        result, _, argv, models = self.run_up(
+            default=None, nativeArguments=True, extra_models={"mmproj-Qwen3.5-9B-F16.gguf": 1})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(argv[argv.index("-m") + 1], str(models / "small model.gguf"))
+
+    def test_projection_only_installation_fails_without_starting(self):
+        result, events, _, _ = self.run_up(default=None, generic_models=False,
+                                           extra_models={"mmproj-Qwen3.5-9B-F16.gguf": 1})
+        self.assert_failed_without_start(result, events)
+
+    def test_captured_launcher_returns_while_background_child_is_alive(self):
+        result, _, _, _ = self.run_up(captureChild=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(result.captured_before_release,
+                        "captured launcher output waited for the long-lived child to exit")
+        self.assertNotIn("background stdout", result.stdout)
+
     def test_native_arguments_preserve_paths_spaces_and_loopback(self):
         result, events, argv, models = self.run_up(nativeArguments=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -150,9 +214,10 @@ class LlmUpTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_new_server_exit_is_reported(self):
-        result, _, _, _ = self.run_up(processExited=True)
+        result, _, _, _ = self.run_up(processExited=True, startupLog="fixture model loading failed")
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("17", result.stdout)
+        self.assertIn("fixture model loading failed", result.stdout)
 
     def test_invalid_ports_are_rejected_before_any_side_effect(self):
         for port in (0, -1, 65536):

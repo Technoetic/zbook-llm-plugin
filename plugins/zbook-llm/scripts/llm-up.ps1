@@ -126,7 +126,7 @@ if (-not $exe) {
     exit 1
 }
 
-# 모델 — default.txt 우선
+# 모델 — 명시한 default.txt 우선, 미지정 시 16GB 실측 권장 모델 순서
 $mdir = Join-Path $root 'models'
 $model = $null
 $defaultFile = Join-Path $mdir 'default.txt'
@@ -141,7 +141,17 @@ if (Test-Path -LiteralPath $defaultFile -PathType Leaf) {
     } catch { W "[주의] default.txt를 읽거나 모델을 선택하지 못했다: $($_.Exception.Message)" }
 }
 if (-not $model) {
+    foreach ($preferred in @('Qwen3.5-9B-Q8_0.gguf', 'Qwen3.5-4B-Q8_0.gguf')) {
+        $candidate = Join-Path $mdir $preferred
+        if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+            $model = Get-Item -LiteralPath $candidate
+            break
+        }
+    }
+}
+if (-not $model) {
     $model = Get-ChildItem -LiteralPath $mdir -Filter '*.gguf' -File |
+             Where-Object { $_.Name -notlike 'mmproj*.gguf' } |
              Sort-Object Length, Name | Select-Object -First 1
 }
 if (-not $model) {
@@ -153,14 +163,15 @@ if (-not $model) {
 W "켜는 중... ($($model.Name))"
 $logs = Join-Path $root 'logs'; New-Item -ItemType Directory -Force $logs | Out-Null
 $logFile = Join-Path $logs 'server.log'
-$errFile = Join-Path $logs 'server-error.txt'
 Remove-Item $logFile -Force -EA SilentlyContinue
 $serverArgs = @('-m', $model.FullName, '--host','127.0.0.1','--port',"$Port",'-ngl','99',
           '-c','32768','-np','4','-b','2048','-ub','512',
           '--cache-ram','0','--metrics','--api-key',$KEY,'--log-file',$logFile)
 $nativeArguments = ($serverArgs | ForEach-Object { ConvertTo-NativeArgument $_ }) -join ' '
 try {
-    $proc = Start-Process -FilePath $exe -ArgumentList $nativeArguments -WindowStyle Hidden -PassThru -RedirectStandardError $errFile -EA Stop
+    # Windows PowerShell의 스트림 리디렉션은 수집 중인 호출자의 파이프를 자식에 남긴다.
+    # 리디렉션 없는 숨김 창으로 독립 실행하고, 진단은 llama-server의 --log-file을 읽는다.
+    $proc = Start-Process -FilePath $exe -ArgumentList $nativeArguments -WindowStyle Hidden -PassThru -EA Stop
     if ($null -eq $proc) { throw 'Start-Process가 프로세스 정보를 반환하지 않았다.' }
 } catch {
     W "[중단] 서버를 실행하지 못했다: $($_.Exception.Message)"
@@ -175,8 +186,8 @@ foreach ($i in 1..60) {
     if ($proc.HasExited) {
         W ""
         W "[중단] 서버가 $sec 초 만에 죽었다 (종료코드 $($proc.ExitCode))."
-        $err = (Get-Content -LiteralPath $errFile -Tail 12 -Encoding UTF8 -EA SilentlyContinue) -join "`n"
-        if ($err) { W "오류:"; W $err } else { W "(오류 출력이 비어 있다)" }
+        $err = (Get-Content -LiteralPath $logFile -Tail 12 -Encoding UTF8 -EA SilentlyContinue) -join "`n"
+        if ($err) { W "서버 로그:"; W $err } else { W "(서버 로그가 아직 기록되지 않았다. 종료코드와 실행 파일을 확인하라.)" }
         W "[다음] 위 내용을 복사해 관리자에게 보내라."
         exit 1
     }

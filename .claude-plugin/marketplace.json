@@ -6,7 +6,7 @@
     {
       "name": "zbook-llm",
       "source": "./plugins/zbook-llm",
-      "description": "ZBook 로컬 AI 검증·기동 및 GPU 16GB 조회 — /llm-check, /llm-up, /vgm-check"
+      "description": "ZBook 로컬 AI 검증·기동 및 GPU 16GB 조회. 기존 모델 지정 보존, 미지정 시 설치된 9B Q8→4B Q8 우선 — /llm-check, /llm-up, /vgm-check"
     }
   ]
 }

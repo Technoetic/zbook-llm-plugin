@@ -1,7 +1,7 @@
 ﻿param([string]$TargetScript, [string]$ScenarioFile)
 
-# All operating-system and HTTP effects are replaced below. Only NativeArguments
-# runs a child process: a temporary, harmless argv recorder, never llama-server.
+# Operating-system discovery and HTTP effects are replaced below. NativeArguments
+# and CaptureChild run harmless temporary child scripts, never llama-server.
 [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 $global:llmUpScenario = Get-Content -LiteralPath $ScenarioFile -Raw -Encoding UTF8 | ConvertFrom-Json
 $global:llmUpEventFile = Join-Path $global:llmUpScenario.temp 'events.jsonl'
@@ -71,10 +71,45 @@ function Invoke-RestMethod {
 }
 function Start-Process {
     [CmdletBinding()]
-    param($FilePath, [string[]]$ArgumentList, $WindowStyle, [switch]$PassThru, $RedirectStandardError)
+    param($FilePath, [string[]]$ArgumentList, $WindowStyle, [switch]$PassThru,
+          $RedirectStandardError, $RedirectStandardOutput)
     Record 'start' @{ arguments = $ArgumentList; windowStyle = $WindowStyle; executable = $FilePath }
     if ($global:llmUpScenario.startFault -eq 'throw') { throw 'fixture launch denied' }
     if ($global:llmUpScenario.startFault -eq 'null') { return $null }
+    if ($global:llmUpScenario.startupLog) {
+        $fixtureLog = Join-Path $global:llmUpScenario.temp 'LLM\logs\server.log'
+        $global:llmUpScenario.startupLog | Set-Content -LiteralPath $fixtureLog -Encoding UTF8
+    }
+    if ($global:llmUpScenario.captureChild) {
+        $childScript = Join-Path $global:llmUpScenario.temp 'harmless background child.ps1'
+        @'
+$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+[IO.File]::WriteAllText((Join-Path $root 'child-started'), 'started')
+Write-Output 'background stdout'
+$timer = [Diagnostics.Stopwatch]::StartNew()
+while (-not (Test-Path -LiteralPath (Join-Path $root 'release-child')) -and $timer.Elapsed.TotalSeconds -lt 20) {
+    Start-Sleep -Milliseconds 50
+}
+[IO.File]::WriteAllText((Join-Path $root 'child-exited'), 'exited')
+'@ | Set-Content -LiteralPath $childScript -Encoding UTF8
+        $launch = @{
+            FilePath = "$PSHOME\powershell.exe"
+            ArgumentList = @('-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+                             '-File', ('"' + $childScript + '"'))
+            WindowStyle = $WindowStyle
+            PassThru = $true
+            ErrorAction = 'Stop'
+        }
+        if ($RedirectStandardError) { $launch.RedirectStandardError = $RedirectStandardError }
+        if ($RedirectStandardOutput) { $launch.RedirectStandardOutput = $RedirectStandardOutput }
+        $child = Microsoft.PowerShell.Management\Start-Process @launch
+        $timer = [Diagnostics.Stopwatch]::StartNew()
+        while (-not (Test-Path -LiteralPath (Join-Path $global:llmUpScenario.temp 'child-started'))) {
+            if ($child.HasExited -or $timer.Elapsed.TotalSeconds -ge 5) { throw 'background fixture did not start' }
+            Microsoft.PowerShell.Utility\Start-Sleep -Milliseconds 25
+        }
+        return $child
+    }
     if ($global:llmUpScenario.nativeArguments) {
         try {
             $prefix = @('-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
