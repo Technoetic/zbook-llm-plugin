@@ -11,7 +11,6 @@
 | `/zbook-llm:llm-check` | `$zbook-llm:llm-check` | 준비 상태 → API·인증 → 실추론 검증. 무인증·틀린 키 거부, `1+1` 정답 `2`와 정상 종료를 확인해야 PASS |
 | `/zbook-llm:llm-up` | `$zbook-llm:llm-up` | 서버 기동. 정상 가동 중인 서버와 유효한 기본 모델 지정을 보존하며, 준비·인증 검사 실패 시 중복 기동하지 않음 |
 | `/zbook-llm:vgm-check` | `$zbook-llm:vgm-check` | GPU 메모리가 16GB인지 읽기 전용 확인. 설치 RAM과 Windows에서 보이는 RAM을 구분하여 출력 |
-| `/zbook-llm:vgm-32gb` | `$zbook-llm:vgm-32gb` | 이전 이름 호환용. GPU 설정 조회만 실행하며 32GB로 변경하지 않음 |
 
 본문에서 `/llm-up`처럼 줄여 부르는 이름도 위 스킬을 뜻합니다. 설치 후 자연어로 "로컬 LLM 상태를 확인해 줘"라고 요청할 수도 있습니다. 포트를 바꿨다면 요청에 함께 적으세요(예: `$zbook-llm:llm-check 포트 18080`).
 
@@ -44,7 +43,7 @@ codex.cmd plugin add zbook-llm@zbook-tools
 ```
 
 설치 후 Claude Code를 재시작하면 위 커맨드를 사용할 수 있습니다. 로컬 수정본은 원격 배포 전까지 로컬 폴더 설치로 사용하세요.
-`/zbook-llm:llm-check`처럼 플러그인 이름을 붙여 부르면 됩니다. 기존 `llm-check`, `llm-up`, `vgm-check`, `vgm-32gb` 기능은 표준 스킬로 제공됩니다.
+`/zbook-llm:llm-check`처럼 플러그인 이름을 붙여 부르면 됩니다. 기존 `llm-check`, `llm-up`, `vgm-check` 기능은 표준 스킬로 제공됩니다. `vgm-32gb`는 0.5.0에서 제거됐습니다(GPU 16GB 유지 정책) — GPU 설정 조회는 `vgm-check`를 쓰세요.
 
 > 로컬 폴더로도 설치할 수 있습니다: `/plugin marketplace add <이 폴더 경로>`
 > (이 방식은 폴더를 지우면 플러그인도 깨지므로, 지워지지 않을 위치에 두세요.)

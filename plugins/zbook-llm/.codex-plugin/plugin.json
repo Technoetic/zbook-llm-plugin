@@ -1,6 +1,6 @@
 {
   "name": "zbook-llm",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "ZBook 로컬 LLM 기동·인증·추론 검증과 GPU 16GB 읽기 전용 조회. Claude Code와 같은 PowerShell 실행부를 사용합니다.",
   "author": {
     "name": "technoetic"

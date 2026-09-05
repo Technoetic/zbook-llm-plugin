@@ -18,12 +18,11 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED = {"llm-check", "llm-up", "vgm-check", "vgm-32gb"}
+EXPECTED = {"llm-check", "llm-up", "vgm-check"}
 EXPECTED_SCRIPTS = {
     "llm-check": {"llm-check.ps1"},
     "llm-up": {"llm-up.ps1", "llm-check.ps1"},
     "vgm-check": {"vgm-check.ps1"},
-    "vgm-32gb": {"vgm-check.ps1"},
 }
 PLUGIN_ID = "zbook-llm@zbook-tools"
 HIDDEN = getattr(subprocess, "CREATE_NO_WINDOW", 0)

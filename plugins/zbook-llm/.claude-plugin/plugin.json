@@ -1,6 +1,6 @@
 {
   "name": "zbook-llm",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "author": { "name": "technoetic" },
-  "description": "ZBook 로컬 AI 연동 도구. /llm-check = 준비 상태·API 인증·실추론 정답 검증, /llm-up = 기존 서버·기본 모델 보존, 미지정 시 설치된 9B Q8→4B Q8 우선 기동. /vgm-check = GPU 16GB 읽기 전용 확인, /vgm-32gb = 조회 전용 호환 명령. 자동 다운로드·BIOS 변경 없음. 포트 8080, 로컬 키 ns-local."
+  "description": "ZBook 로컬 AI 연동 도구. /llm-check = 준비 상태·API 인증·실추론 정답 검증, /llm-up = 기존 서버·기본 모델 보존, 미지정 시 설치된 9B Q8→4B Q8 우선 기동. /vgm-check = GPU 16GB 읽기 전용 확인. 자동 다운로드·BIOS 변경 없음. 포트 8080, 로컬 키 ns-local."
 }
