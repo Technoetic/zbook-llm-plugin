@@ -1,17 +1,40 @@
 # zbook-tools — ZBook 로컬 AI 플러그인 마켓플레이스
 
-같은 기종 ZBook에 구축한 **로컬 AI 스택(llama.cpp Vulkan + Qwen GGUF, `<드라이브>:\LLM`)**을 Claude Code에서 바로 다루는 플러그인 모음입니다. **0.3.0은 GPU 메모리 16GB를 유지**하며, 한국어 구조화 추출의 정확도를 우선하면 Qwen3.5-9B-Q8_0, 응답 속도를 우선하면 Qwen3.5-4B-Q8_0를 권장합니다. BIOS 변경·재부팅 기능은 제공하지 않습니다.
+같은 기종 ZBook에 구축한 **로컬 AI 스택(llama.cpp Vulkan + Qwen GGUF, `<드라이브>:\LLM`)**을 **Claude Code와 Codex에서 플러그인으로 설치해 사용하는** 저장소입니다. **0.4.0**부터 두 클라이언트가 같은 스킬과 PowerShell 실행부를 공유합니다. GPU 메모리는 **16GB 유지**, 한국어 구조화 추출의 정확도 우선은 Qwen3.5-9B-Q8_0, 속도 우선은 Qwen3.5-4B-Q8_0입니다. BIOS 변경·재부팅 기능은 제공하지 않습니다.
 
 ## 플러그인
 
 ### zbook-llm
 
-| 커맨드 | 하는 일 |
-|---|---|
-| `/llm-check` | 준비 상태 → API·인증 → 실추론 검증. 무인증·틀린 키 거부, `1+1` 정답 `2`와 정상 종료를 확인해야 PASS |
-| `/llm-up` | 서버 기동. 정상 가동 중인 서버와 유효한 기본 모델 지정을 보존하며, 준비·인증 검사 실패 시 중복 기동하지 않음 |
-| `/vgm-check` | GPU 메모리가 16GB인지 읽기 전용 확인. 설치 RAM과 Windows에서 보이는 RAM을 구분하여 출력 |
-| `/vgm-32gb` | 이전 명령 호환용. `/vgm-check`만 실행하며 32GB로 변경하지 않음 |
+| Claude Code | Codex | 하는 일 |
+|---|---|---|
+| `/zbook-llm:llm-check` | `$zbook-llm:llm-check` | 준비 상태 → API·인증 → 실추론 검증. 무인증·틀린 키 거부, `1+1` 정답 `2`와 정상 종료를 확인해야 PASS |
+| `/zbook-llm:llm-up` | `$zbook-llm:llm-up` | 서버 기동. 정상 가동 중인 서버와 유효한 기본 모델 지정을 보존하며, 준비·인증 검사 실패 시 중복 기동하지 않음 |
+| `/zbook-llm:vgm-check` | `$zbook-llm:vgm-check` | GPU 메모리가 16GB인지 읽기 전용 확인. 설치 RAM과 Windows에서 보이는 RAM을 구분하여 출력 |
+| `/zbook-llm:vgm-32gb` | `$zbook-llm:vgm-32gb` | 이전 이름 호환용. GPU 설정 조회만 실행하며 32GB로 변경하지 않음 |
+
+본문에서 `/llm-up`처럼 줄여 부르는 이름도 위 스킬을 뜻합니다. 설치 후 자연어로 "로컬 LLM 상태를 확인해 줘"라고 요청할 수도 있습니다. 포트를 바꿨다면 요청에 함께 적으세요(예: `$zbook-llm:llm-check 포트 18080`).
+
+## 설치 (Codex)
+
+Windows PowerShell에서 실행합니다. Codex CLI **0.150.1**로 검증했습니다. `codex.cmd`는 PowerShell 실행 정책에 의해 `codex.ps1` 래퍼가 차단되는 경우에도 같은 CLI를 실행합니다.
+
+```powershell
+codex.cmd plugin marketplace add Technoetic/zbook-llm-plugin
+codex.cmd plugin add zbook-llm@zbook-tools
+codex.cmd plugin list --json
+```
+
+설치 후 **새 Codex 대화**를 열고 `$zbook-llm:llm-check`를 선택하세요. 기존 대화에는 새 스킬 목록이 자동 반영되지 않을 수 있습니다. 서버를 켜야 한다면 `$zbook-llm:llm-up`을 사용합니다. 상태 확인만 요청하면 자동 기동하지 않습니다.
+
+Codex 업데이트는 다음과 같습니다.
+
+```powershell
+codex.cmd plugin marketplace upgrade zbook-tools
+codex.cmd plugin add zbook-llm@zbook-tools
+```
+
+로컬 개발본은 `codex.cmd plugin marketplace add <저장소 폴더>`로 등록할 수 있습니다. 원격 배포본과 같은 `zbook-tools` 이름을 쓰므로 현재 등록 원본을 `codex.cmd plugin marketplace list --json`으로 확인하고 선택하세요.
 
 ## 설치 (Claude Code)
 
@@ -21,7 +44,7 @@
 ```
 
 설치 후 Claude Code를 재시작하면 위 커맨드를 사용할 수 있습니다. 로컬 수정본은 원격 배포 전까지 로컬 폴더 설치로 사용하세요.
-같은 이름의 커맨드를 이미 갖고 있다면 `/zbook-llm:llm-check`처럼 플러그인 이름을 붙여 부르면 됩니다.
+`/zbook-llm:llm-check`처럼 플러그인 이름을 붙여 부르면 됩니다. 기존 `llm-check`, `llm-up`, `vgm-check`, `vgm-32gb` 기능은 표준 스킬로 제공됩니다.
 
 > 로컬 폴더로도 설치할 수 있습니다: `/plugin marketplace add <이 폴더 경로>`
 > (이 방식은 폴더를 지우면 플러그인도 깨지므로, 지워지지 않을 위치에 두세요.)
@@ -57,9 +80,13 @@
 
 서버는 출력 리디렉션 없이 숨김 창으로 백그라운드 기동합니다. 호출자가 출력을 수집할 때 서버 종료까지 기다리는 문제를 피하고, 진단 기록은 서버의 `--log-file`로 남깁니다. 이전 버전의 `server-error.txt`는 갱신하지 않으므로 현재 기동의 오류 근거로 사용하지 마세요.
 
-## PowerShell 직접 실행 (Codex 등)
+## 공통 실행부와 직접 실행
 
-Claude Code 플러그인 명령을 지원하지 않는 에이전트도 다음 스크립트를 실행할 수 있습니다. Codex 전용 플러그인으로 등록된다는 뜻은 아닙니다. Codex 0.150.1에서 legacy import는 시험했으나, 가져온 명령의 `${CLAUDE_PLUGIN_ROOT}` 자동 치환은 검증되지 않았으므로 직접 실행 시 아래 실제 스크립트 경로를 사용하세요.
+두 클라이언트의 설치 등록 정보는 각각 `.claude-plugin/`과 `.agents/plugins/marketplace.json`·플러그인 내부 `.codex-plugin/plugin.json`에 있습니다. 실제 지침은 `plugins/zbook-llm/skills/`, 실행부는 같은 플러그인의 `scripts/`에 한 번만 둡니다. 스킬은 설치된 자신의 경로에서 공유 스크립트를 찾아 실행하므로 작업 폴더나 Claude 전용 경로 변수에 의존하지 않습니다.
+
+0.3.x까지의 `commands/` 지침은 같은 이름의 표준 `skills/`로 옮겼습니다. Codex에서 `source-command-*`로 중복 변환되는 문제를 막으며, Claude Code의 플러그인 스킬 명령도 같은 이름을 사용합니다. [Claude Code 스킬 문서](https://code.claude.com/docs/en/skills), [OpenAI 플러그인 변환 안내](https://developers.openai.com/plugins/guides/submit-claude-plugin).
+
+플러그인을 통하지 않고 직접 실행할 때는 저장소 루트에서 다음을 사용할 수 있습니다.
 
 ```powershell
 powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File .\plugins\zbook-llm\scripts\llm-check.ps1
@@ -78,4 +105,6 @@ Windows와 Python 3에서 저장소 루트에서 실행합니다. 별도 Python 
 python -m unittest discover -s tests -v
 ```
 
-테스트는 HTTP·프로세스·BIOS 조회를 모의하고, 인자 전달은 무해한 보조 실행 파일로 확인합니다. 무해한 백그라운드 자식 프로세스가 계속 실행되는 동안 출력 수집을 마친 호출자가 반환하는지도 검사합니다. 실제 LLM 시작·종료나 BIOS 변경은 하지 않습니다. 실제 모델 로딩·Vulkan 동작은 설치된 장비에서 별도 확인해야 합니다.
+테스트는 HTTP·프로세스·BIOS 조회를 모의하고, 인자 전달은 무해한 보조 실행 파일로 확인합니다. 무해한 백그라운드 자식 프로세스가 계속 실행되는 동안 출력 수집을 마친 호출자가 반환하는지도 검사하며, 임시 폴더 정리는 프로세스의 실제 종료를 기다립니다. 실제 LLM 시작·종료나 BIOS 변경은 하지 않습니다.
+
+Codex CLI가 있으면 별도 `CODEX_HOME`과 공백·한글이 포함된 임시 설치 경로에서 실제 플러그인 설치와 `skills/list`를 검사합니다. 사용자 설치 설정이나 API 자격증명을 사용하지 않으며 모델 API 요청도 보내지 않습니다. CLI가 없으면 이 연동 검사만 건너뜁니다. 실제 모델 로딩·Vulkan 동작과 새 대화의 사용 경험은 설치된 장비에서 별도 확인해야 합니다.

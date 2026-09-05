@@ -91,6 +91,8 @@ while (-not (Test-Path -LiteralPath (Join-Path $root 'release-child')) -and $tim
     Start-Sleep -Milliseconds 50
 }
 [IO.File]::WriteAllText((Join-Path $root 'child-exited'), 'exited')
+# Keep shutdown observably separate from the marker: cleanup must wait for the process.
+Start-Sleep -Milliseconds 250
 '@ | Set-Content -LiteralPath $childScript -Encoding UTF8
         $launch = @{
             FilePath = "$PSHOME\powershell.exe"
@@ -103,6 +105,7 @@ while (-not (Test-Path -LiteralPath (Join-Path $root 'release-child')) -and $tim
         if ($RedirectStandardError) { $launch.RedirectStandardError = $RedirectStandardError }
         if ($RedirectStandardOutput) { $launch.RedirectStandardOutput = $RedirectStandardOutput }
         $child = Microsoft.PowerShell.Management\Start-Process @launch
+        [IO.File]::WriteAllText((Join-Path $global:llmUpScenario.temp 'child-pid'), [string]$child.Id)
         $timer = [Diagnostics.Stopwatch]::StartNew()
         while (-not (Test-Path -LiteralPath (Join-Path $global:llmUpScenario.temp 'child-started'))) {
             if ($child.HasExited -or $timer.Elapsed.TotalSeconds -ge 5) { throw 'background fixture did not start' }

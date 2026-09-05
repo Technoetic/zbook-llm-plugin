@@ -1,4 +1,4 @@
-# GPU 16GB 모델 운영 정책 — 0.3.0
+# GPU 16GB 모델 운영 정책
 
 한국어 구조화 추출의 정확도를 우선하면 **Qwen3.5-9B-Q8_0**, 응답 속도를 우선하면 **Qwen3.5-4B-Q8_0**를 권장합니다. GPU 메모리 BIOS 설정은 **16GB로 유지**합니다. 아래 비교는 특정 장비·합성 자료의 실험 결과이며, 모든 업무에서 9B가 우수하다는 뜻은 아닙니다.
 
@@ -37,7 +37,7 @@ Set-Content -LiteralPath $markerPath -Value $modelName -Encoding UTF8 -ErrorActi
 Get-Content -LiteralPath $markerPath -Encoding UTF8
 ```
 
-현재 서버는 계속 실행됩니다. 즉시 적용이 필요하면 **서버 소유자가 작업 완료를 확인하고 해당 서버만 종료한 뒤** `/llm-up`과 `/llm-check`를 차례로 실행하세요. 직접 기동했다면 기동 출력의 PID로 대상을 확인할 수 있습니다. 전체 `llama-server` 프로세스를 일괄 종료하지 마세요. `/v1/models`에 실제 선택 모델이 표시되고 `/llm-check`가 통과하는지 확인하세요.
+현재 서버는 계속 실행됩니다. 즉시 적용이 필요하면 **서버 소유자가 작업 완료를 확인하고 해당 서버만 종료한 뒤** `llm-up`과 `llm-check` 스킬을 차례로 실행하세요. Claude Code에서는 `/zbook-llm:llm-up`·`/zbook-llm:llm-check`, Codex에서는 `$zbook-llm:llm-up`·`$zbook-llm:llm-check`입니다. 직접 기동했다면 기동 출력의 PID로 대상을 확인할 수 있습니다. 전체 `llama-server` 프로세스를 일괄 종료하지 마세요. `/v1/models`에 실제 선택 모델이 표시되고 `llm-check`가 통과하는지 확인하세요.
 
 ## 선택 사항: 검증한 9B 파일 출처
 

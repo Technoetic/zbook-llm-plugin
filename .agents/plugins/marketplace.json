@@ -1,0 +1,20 @@
+{
+  "name": "zbook-tools",
+  "interface": {
+    "displayName": "Zbook Tools"
+  },
+  "plugins": [
+    {
+      "name": "zbook-llm",
+      "source": {
+        "source": "local",
+        "path": "./plugins/zbook-llm"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

@@ -1,13 +1,14 @@
 """Behavioral startup regressions using isolated Windows PowerShell fixtures."""
 
 import base64
+import ctypes
+from ctypes import wintypes
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-import time
 import unittest
 
 
@@ -15,6 +16,37 @@ REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "plugins" / "zbook-llm" / "scripts" / "llm-up.ps1"
 HARNESS = Path(__file__).resolve().parent / "fixtures" / "llm-up-harness.ps1"
 POWERSHELL = shutil.which("powershell.exe")
+
+
+def release_fixture_child(root):
+    """Release only our fixture child and wait for Windows to close its cwd handle."""
+    pid_file = root / "child-pid"
+    if not pid_file.exists():
+        (root / "release-child").touch()
+        return
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel.WaitForSingleObject.restype = wintypes.DWORD
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel.CloseHandle.restype = wintypes.BOOL
+    handle = kernel.OpenProcess(0x00100000, False, int(pid_file.read_text()))  # SYNCHRONIZE only
+    if not handle:
+        error = ctypes.get_last_error()
+        (root / "release-child").touch()
+        if error != 87:  # ERROR_INVALID_PARAMETER: process has already exited
+            raise ctypes.WinError(error)
+        return
+    try:
+        (root / "release-child").touch()
+        status = kernel.WaitForSingleObject(handle, 5000)
+        if status == 0xFFFFFFFF:
+            raise ctypes.WinError(ctypes.get_last_error())
+        if status != 0:
+            raise TimeoutError("temporary background fixture did not exit after release")
+    finally:
+        kernel.CloseHandle(handle)
 
 
 @unittest.skipUnless(os.name == "nt" and POWERSHELL, "Windows PowerShell 5.1 required")
@@ -69,11 +101,7 @@ class LlmUpTests(unittest.TestCase):
                     (root / "release-child").touch()
                     stdout, stderr = process.communicate(timeout=10)
                 finally:
-                    (root / "release-child").touch()
-                    if (root / "child-started").exists():
-                        deadline = time.monotonic() + 5
-                        while not (root / "child-exited").exists() and time.monotonic() < deadline:
-                            time.sleep(0.05)
+                    release_fixture_child(root)
                 result = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
                 result.captured_before_release = captured_before_release
             event_file = root / "events.jsonl"

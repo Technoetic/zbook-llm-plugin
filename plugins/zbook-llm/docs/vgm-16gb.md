@@ -1,12 +1,12 @@
 # ZBook Ultra G1a — GPU 메모리 16GB 유지 확인
 
-운영 정책은 **GPU 메모리 16GB 유지**다. `/vgm-check`는 HP BIOS 설정과 RAM 수치를 읽기 전용으로 확인한다. BIOS 변경이나 재부팅은 수행하지 않는다. `/vgm-32gb`는 기존 호출을 위한 호환 별칭으로 같은 검사만 실행한다.
+운영 정책은 **GPU 메모리 16GB 유지**다. `vgm-check` 스킬은 HP BIOS 설정과 RAM 수치를 읽기 전용으로 확인한다. BIOS 변경이나 재부팅은 수행하지 않는다. `vgm-32gb`는 기존 호출을 위한 호환 별칭으로 같은 검사만 실행한다.
 
 2026-09-05 확인된 기계는 `HP ZBook Ultra G1a 14 inch Mobile Workstation PC`이며, BIOS `Dedicated Graphics Memory` 값은 `16 GB`, 설치 RAM은 `64.00 GiB`, Windows 인식 총 RAM은 약 `47.78 GiB`다. 다른 기계에서는 실제 조회 결과를 보고하며 이 RAM 수치를 강제하지 않는다.
 
 ## 실행과 판정
 
-플러그인 명령 `/vgm-check`를 사용한다. 스크립트를 직접 실행할 때는 설치 경로를 지정한다.
+Claude Code에서는 `/zbook-llm:vgm-check`, Codex에서는 `$zbook-llm:vgm-check`를 사용한다. 스크립트를 직접 실행할 때는 설치 경로를 지정한다.
 
 ```powershell
 powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "<플러그인 설치 폴더>\scripts\vgm-check.ps1"
@@ -34,6 +34,6 @@ HP BIOS 네임스페이스가 없거나 접근할 수 없으면 RAM 수치로 BI
 
 ## 모델 운영 범위
 
-현재 4B 모델의 운영 기준은 16GB다. 기존 35B-A3B 모델 측정은 **32GB 설정에서만** 수행되었다. **16GB에서 35B의 실행 여부와 처리 속도는 미측정**이며, 과거 결과를 근거로 16GB에서는 실행 불가라거나 특정 토큰 속도가 나온다고 단정하지 않는다.
+현재 4B·9B 모델의 운영 기준은 16GB다. 선택 기준과 측정 조건은 [모델 운영 정책](model-policy-16gb.md)을 따른다. 기존 35B-A3B 모델 측정은 **32GB 설정에서만** 수행되었다. **16GB에서 35B의 실행 여부와 처리 속도는 미측정**이며, 과거 결과를 근거로 16GB에서는 실행 불가라거나 특정 토큰 속도가 나온다고 단정하지 않는다.
 
 16GB 조건에서 큰 모델을 평가하려면 모델·양자화·컨텍스트·GPU 오프로딩 조건을 기록한 별도 측정이 필요하다. 현재 설정을 유지하며, 32GB 전환을 이 플러그인의 권장 해결책으로 삼지 않는다.
